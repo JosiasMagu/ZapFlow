@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Altura total e sem scroll horizontal global */
+html, body, #root {
+  height: 100%;
+}
+body {
+  @apply bg-black text-white overflow-x-hidden;
+}
+
+/* Imagens nunca estouram o container */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Container padrão com gutters */
+.container-page {
+  @apply mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8;
+}
+
+/* Anti-overflow em layouts flex/grid dentro do container */
+.container-page, 
+.container-page > * {
+  min-width: 0;
+}
+
+/* Correções “defensivas” para classes problemáticas comuns */
+.container-page [class*="w-screen"] { width: 100% !important; }
+.container-page [class*="min-w-screen"] { min-width: 100% !important; }
+
+/* Tabelas longas: rolagem apenas no X do bloco, não da página */
+.table-wrap {
+  overflow-x: auto;
+}
+.table-wrap table {
+  min-width: 720px; /* ajuste se precisar */
+}

@@ -1,0 +1,55 @@
+# --- Logs ---
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# --- Dependências / build ---
+node_modules/
+dist/
+dist-ssr/
+.vite/
+.storybook-out/
+storybook-static/
+
+# --- Caches / ferramentas ---
+.eslintcache
+.stylelintcache
+.cache/
+.parcel-cache/
+.turbo/
+coverage/
+
+# --- Ambiente (.env NUNCA vai pro repo) ---
+.env
+.env.local
+.env.*.local
+# Se usares diferentes ambientes:
+# .env.development.local
+# .env.production.local
+# .env.test.local
+
+# --- Editor / SO ---
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# --- Testes (se vieres a usar) ---
+cypress/videos/
+cypress/screenshots/
+playwright-report/
+test-results/
+
+# --- Deploy (se aplicável) ---
+.vercel/
+.netlify/
