@@ -1,74 +1,78 @@
+import React from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import TrialBanner from '../Pages/Dashboard/Components/TrialBanner'
-import { Bot, Send, Users, LayoutDashboard, Sparkles } from 'lucide-react'
-
-const linkBase = 'flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition'
-const linkAct = 'bg-green-500/20 text-green-300 border border-green-500/30'
-const linkInact = 'text-gray-300 hover:text-green-300 hover:bg-green-500/10'
+import { UpgradeProvider } from '../Pages/Context/UpgradeContext'
+import UpgradeModal from '../components/UpgradeModal'
+import { MessageSquare } from 'lucide-react'
 
 export default function DashboardLayouts() {
   return (
-    <div className="min-h-screen bg-black text-white">
-      <div className="flex">
+    <UpgradeProvider>
+      <div className="min-h-screen bg-black text-white flex">
+
         {/* Sidebar */}
-        <aside className="w-64 bg-gray-900 border-r border-green-500/20 min-h-screen p-4">
-          <div className="text-lg font-bold mb-4 flex items-center gap-2">
-            <LayoutDashboard className="h-5 w-5 text-green-400" />
-            Dashboard
+        <aside className="w-64 border-r border-green-500/20 bg-gray-950 hidden md:flex md:flex-col">
+          <div className="h-14 px-4 border-b border-green-500/20 flex items-center gap-2">
+            <div className="h-8 w-8 rounded-md bg-green-500 flex items-center justify-center">
+              <MessageSquare className="h-5 w-5 text-black" />
+            </div>
+            <div className="font-bold">ZapFlow</div>
           </div>
 
-          <nav className="space-y-2">
-            <NavLink
-              to="/dashboard"
-              end
-              className={({ isActive }) => `${linkBase} ${isActive ? linkAct : linkInact}`}
-            >
-              <LayoutDashboard className="h-4 w-4" /> Início
-            </NavLink>
-
-            <NavLink
-              to="/dashboard/flows"
-              className={({ isActive }) => `${linkBase} ${isActive ? linkAct : linkInact}`}
-            >
-              <Bot className="h-4 w-4" /> Flows
-            </NavLink>
-
-            <NavLink
-              to="/dashboard/broadcasts"
-              className={({ isActive }) => `${linkBase} ${isActive ? linkAct : linkInact}`}
-            >
-              <Send className="h-4 w-4" /> Broadcasts
-            </NavLink>
-
-            <NavLink
-              to="/dashboard/contacts"
-              className={({ isActive }) => `${linkBase} ${isActive ? linkAct : linkInact}`}
-            >
-              <Users className="h-4 w-4" /> Contacts
-            </NavLink>
-
-            <NavLink
-              to="/dashboard/templates"
-              className={({ isActive }) => `${linkBase} ${isActive ? linkAct : linkInact}`}
-            >
-              <Sparkles className="h-4 w-4" /> Templates
-            </NavLink>
+          <nav className="p-3 space-y-1 text-sm">
+            <Item to="/dashboard" end>Início</Item>
+            <Item to="/dashboard/bots">Bots (IA)</Item>
+            <Item to="/dashboard/flows">Fluxos (No-code)</Item>
+            <Item to="/dashboard/broadcasts">Campanhas</Item>
+            <Item to="/dashboard/contacts">Contactos</Item>
+            <Item to="/dashboard/settings">Definições</Item>
           </nav>
         </aside>
 
         {/* Main */}
-        <main className="flex-1">
-          <header className="bg-gray-900 border-b border-green-500/20 p-4">
-            {/* Topbar simples ou filtros no futuro */}
-            <div className="text-sm text-gray-400">ZapFlow • Painel</div>
+        <div className="flex-1 flex flex-col">
+          {/* Topbar simples */}
+          <header className="h-14 border-b border-green-500/20 bg-gray-950/60 backdrop-blur flex items-center px-4">
+            <div className="md:hidden font-semibold">Menu</div>
+            <div className="ml-auto text-sm text-gray-400">
+              Painel de controlo
+            </div>
           </header>
 
-          <div className="p-4 md:p-6">
+          {/* Conteúdo */}
+          <main className="p-4 md:p-6">
             <TrialBanner />
             <Outlet />
-          </div>
-        </main>
+          </main>
+        </div>
       </div>
-    </div>
+
+      {/* Modal de Upgrade global */}
+      <UpgradeModal />
+    </UpgradeProvider>
+  )
+}
+
+function Item({
+  to,
+  end,
+  children,
+}: {
+  to: string
+  end?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      className={({ isActive }) =>
+        `block rounded-md px-3 py-2 hover:bg-green-500/10 ${
+          isActive ? 'bg-green-500/10 text-green-300' : 'text-gray-300'
+        }`
+      }
+    >
+      {children}
+    </NavLink>
   )
 }

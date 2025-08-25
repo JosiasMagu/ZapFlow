@@ -4,7 +4,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import HomePage from './Pages/Home/HomePage'
 import LoginPage from './Pages/LoginPage'
 import SignUpPage from './Pages/Auth/SignUpPage'
-
+import BotsPage from './Pages/Bots/BotsPage'
 import DashboardLayout from './Layouts/DashboardLayouts'
 import DashboardHome from './Pages/Dashboard/DashboardHome'
 
@@ -29,7 +29,7 @@ export default function App() {
       {/* Dashboard */}
       <Route path="/dashboard" element={<DashboardLayout />}>
         <Route index element={<DashboardHome />} />
-
+        <Route path="bots" element={<BotsPage />} />  
         {/* Flows: lista + canvas */}
         <Route path="flows" element={<FlowBuilderPage />} />
         <Route path="flows/:id" element={<FlowCanvasPage />} />
