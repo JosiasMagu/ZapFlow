@@ -1,208 +1,401 @@
-// src/Pages/Dashboard/DashboardHome.tsx
-import React, { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+// FILE: src/lib/api.ts
 import {
-  Bot, Send, Upload, Sparkles,
-  BarChart3, Users, MessageSquare, Percent,
-  ChevronRight, AlertCircle, Clock
-} from 'lucide-react'
-import Guard from './Components/Guard'
-import { getDashboardSnapshot, listRecentActivity } from '../../lib/api'
-import type { DashboardSnapshot, Activity } from '../../lib/types'
+  type UserSession,
+  type Bot,
+  type Broadcast,
+  type FlowModel,
+  type FlowNode,
+  type NodeKind,
+  type FlowEdge,
+  type DashboardSnapshot,
+  type Activity,
+} from '../../lib/types'
+import { readJSON, writeJSON, uid } from '../../lib/utils'
 
-function StatCard({
-  icon, label, value, hint,
-}: { icon: React.ReactNode; label: string; value: string; hint?: string }) {
-  return (
-    <div className="rounded-xl border border-green-500/20 bg-gray-950 p-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-green-400">{icon}<span className="text-sm">{label}</span></div>
-      </div>
-      <div className="mt-2 text-2xl font-bold">{value}</div>
-      {hint && <div className="mt-1 text-xs text-gray-400">{hint}</div>}
-    </div>
-  )
+// =========================
+// LocalStorage Keys
+// =========================
+const LS_SESSION = 'mock_session'
+const LS_BOTS = 'mock_bots'
+const LS_BROADCASTS = 'mock_broadcasts'
+const LS_CONTACTS = 'mock_contacts'
+const LS_FLOW_MODELS = 'mock_flow_models' // Record<string, FlowModel>
+
+// =========================
+// Helpers
+// =========================
+function nowISO() {
+  return new Date().toISOString()
 }
 
-function QuickAction({
-  to, icon, title, desc,
-}: { to?: string; icon: React.ReactNode; title: string; desc: string }) {
-  const body = (
-    <div className="rounded-xl border border-green-500/20 p-4 bg-gray-950 hover:border-green-400 transition">
-      <div className="flex items-start gap-3">
-        <div className="text-green-400">{icon}</div>
-        <div className="flex-1">
-          <div className="font-semibold">{title}</div>
-          <div className="text-sm text-gray-400">{desc}</div>
-        </div>
-        <ChevronRight className="h-4 w-4 text-gray-500" />
-      </div>
-    </div>
-  )
-  return to ? <Link to={to}>{body}</Link> : body
+function ensureStore<T>(key: string, def: T): T {
+  const v = readJSON<T>(key, def)
+  if (v === def) writeJSON(key, def)
+  return v
 }
 
-function ActivityItem({ a }: { a: Activity }) {
-  const iconMap = {
-    bot_run: <Bot className="h-4 w-4" />,
-    broadcast: <Send className="h-4 w-4" />,
-    contact_import: <Upload className="h-4 w-4" />,
-    flow_published: <Sparkles className="h-4 w-4" />,
+function upsertRecord<T extends object>(key: string, id: string, value: T) {
+  const store = readJSON<Record<string, T>>(key, {})
+  store[id] = value
+  writeJSON(key, store)
+  return value
+}
+
+function removeRecord<T>(key: string, id: string) {
+  const store = readJSON<Record<string, T>>(key, {})
+  delete store[id]
+  writeJSON(key, store)
+}
+
+function getRecord<T>(key: string, id: string): T | null {
+  const store = readJSON<Record<string, T>>(key, {})
+  return store[id] ?? null
+}
+
+function getAllRecords<T>(key: string): Record<string, T> {
+  return readJSON<Record<string, T>>(key, {})
+}
+
+// =========================
+// Sessão / Autenticação (MVP local)
+// =========================
+
+export function getSession(): UserSession | null {
+  return readJSON<UserSession | null>(LS_SESSION, null)
+}
+
+export async function createTrialSession(
+  email: string
+): Promise<{ ok: true; data: UserSession } | { ok: false; error: string }> {
+  const trialEndsAt = new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString()
+  const session: UserSession = {
+    userId: 'usr_' + uid(),
+    email,
+    plan: 'trial',
+    trialEndsAt,
   }
-  const color =
-    a.status === 'error'
-      ? 'text-red-400'
-      : a.status === 'warning'
-      ? 'text-yellow-400'
-      : 'text-green-400'
-  return (
-    <div className="rounded-lg border border-green-500/20 bg-gray-950 p-3">
-      <div className="flex items-start gap-3">
-        <div className={`mt-0.5 ${color}`}>{iconMap[a.type]}</div>
-        <div className="flex-1">
-          <div className="text-sm font-semibold">{a.title}</div>
-          <div className="text-xs text-gray-400">{a.description}</div>
-          <div className="mt-1 flex items-center gap-1 text-[11px] text-gray-500">
-            <Clock className="h-3 w-3" />
-            {new Date(a.ts).toLocaleString()}
-          </div>
-        </div>
-        {a.status && (
-          <div className={`text-[10px] px-2 py-0.5 rounded-full border ${color} ${color.replace('text', 'border')}`}>
-            {a.status}
-          </div>
-        )}
-      </div>
-    </div>
-  )
+  writeJSON(LS_SESSION, session)
+  return { ok: true, data: session }
 }
 
-export default function DashboardHome() {
-  const navigate = useNavigate()
-  const [loading, setLoading] = useState(true)
-  const [snap, setSnap] = useState<DashboardSnapshot | null>(null)
-  const [activities, setActivities] = useState<Activity[]>([])
+export async function loginWithEmail(
+  email: string,
+  _password: string
+): Promise<{ ok: true; data: UserSession } | { ok: false; error: string }> {
+  let session = getSession()
+  if (!session) {
+    const r = await createTrialSession(email)
+    if (!r.ok) return r
+    session = r.data
+  } else {
+    if (session.email !== email) {
+      session = { ...session, email }
+      writeJSON(LS_SESSION, session)
+    }
+  }
+  return { ok: true, data: session }
+}
 
-  useEffect(() => {
-    let mounted = true
-    ;(async () => {
-      setLoading(true)
-      const [s, acts] = await Promise.all([getDashboardSnapshot(), listRecentActivity()])
-      if (mounted) {
-        setSnap(s)
-        setActivities(acts)
-        setLoading(false)
-      }
-    })()
-    return () => { mounted = false }
-  }, [])
+// (compat p/ AuthProvider opcional)
+export async function getMe(_token: string) {
+  const s = getSession()
+  if (!s) return null
+  return { id: s.userId, email: s.email, plan: s.plan }
+}
 
-  return (
-    <div className="space-y-6">
-      {/* Header simples */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Bem-vindo 👋</h1>
-        <button
-          onClick={() => navigate('/#pricing')}
-          className="inline-flex items-center gap-2 rounded-full bg-green-500 px-3 py-1.5 text-sm font-semibold text-black hover:bg-green-400"
-        >
-          Atualizar plano <ChevronRight className="h-4 w-4" />
-        </button>
-      </div>
+// =========================
+export type WhatsappStatus = 'disconnected' | 'connecting' | 'qr' | 'connected'
 
-      {/* Alert se dados não carregarem */}
-      {!loading && !snap && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 text-red-300 p-3 text-sm flex items-center gap-2">
-          <AlertCircle className="h-4 w-4" /> Não foi possível carregar os dados do dashboard.
-        </div>
-      )}
+export async function getWhatsappStatus(): Promise<{ ok: true; data: { status: WhatsappStatus } }> {
+  const statuses: WhatsappStatus[] = ['disconnected', 'connecting', 'qr', 'connected']
+  const idx = Math.min(Math.floor((Date.now() / 5000) % statuses.length), statuses.length - 1)
+  return { ok: true, data: { status: statuses[idx] } }
+}
 
-      {/* Métricas */}
-      <div className="grid md:grid-cols-4 gap-4">
-        {loading || !snap ? (
-          Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="rounded-xl border border-green-500/20 bg-gray-950 p-4 animate-pulse h-24" />
-          ))
-        ) : (
-          <>
-            <StatCard icon={<BarChart3 className="h-4 w-4" />} label="Automações (30d)" value={snap.totals.automations.toLocaleString()} hint="+12% vs mês anterior" />
-            <StatCard icon={<Percent className="h-4 w-4" />} label="Sucesso" value={`${snap.totals.successRate}%`} hint="erros < 0,5%" />
-            <StatCard icon={<Users className="h-4 w-4" />} label="Contatos" value={snap.totals.contacts.toLocaleString()} hint="ativos no CRM" />
-            <StatCard icon={<MessageSquare className="h-4 w-4" />} label="Mensagens (30d)" value={snap.totals.messages.toLocaleString()} hint="+8% vs mês anterior" />
-          </>
-        )}
-      </div>
+// =========================
+// Bots (IA)
+// =========================
+function readBots(): Bot[] {
+  return ensureStore<Bot[]>(LS_BOTS, [])
+}
+function writeBots(arr: Bot[]) {
+  writeJSON(LS_BOTS, arr)
+}
 
-      {/* Atalhos rápidos */}
-      <div className="grid md:grid-cols-4 gap-4">
-        <Guard feature="bot" trialAllowed>
-          <QuickAction
-            to="/dashboard/flows"
-            icon={<Bot className="h-5 w-5" />}
-            title="Criar fluxo com bot"
-            desc="Construa seu fluxo visual com nós e condições"
-          />
-        </Guard>
+export async function listBots(): Promise<{ ok: true; data: Bot[] }> {
+  return { ok: true, data: readBots() }
+}
 
-        <Guard feature="broadcast" trialAllowed>
-          <QuickAction
-            to="/dashboard/broadcasts"
-            icon={<Send className="h-5 w-5" />}
-            title="Campanha manual"
-            desc="Dispare mensagens para uma lista"
-          />
-        </Guard>
+export async function createBot(name: string): Promise<{ ok: true; data: Bot }> {
+  const all = readBots()
+  const b: Bot = { id: 'bot_' + uid(), name, status: 'active', createdAt: nowISO() }
+  all.unshift(b)
+  writeBots(all)
+  return { ok: true, data: b }
+}
 
-        <Guard feature="contacts" trialAllowed>
-          <QuickAction
-            to="/dashboard/contacts"
-            icon={<Upload className="h-5 w-5" />}
-            title="Importar contatos"
-            desc="Suba CSV e segmente listas"
-          />
-        </Guard>
+export async function toggleBot(id: string): Promise<{ ok: true }> {
+  const all = readBots()
+  const i = all.findIndex((x) => x.id === id)
+  if (i >= 0) {
+    all[i] = { ...all[i], status: all[i].status === 'active' ? 'paused' : 'active' }
+    writeBots(all)
+  }
+  return { ok: true }
+}
 
-        <Guard feature="advanced">
-          <QuickAction
-            to="/dashboard/templates"
-            icon={<Sparkles className="h-5 w-5" />}
-            title="Modelos prontos"
-            desc="Playbooks e integrações avançadas"
-          />
-        </Guard>
-      </div>
+export async function deleteBot(id: string): Promise<{ ok: true }> {
+  const all = readBots().filter((x) => x.id !== id)
+  writeBots(all)
+  return { ok: true }
+}
 
-      {/* Atividade recente */}
-      <div className="grid md:grid-cols-3 gap-4">
-        <div className="md:col-span-2 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Atividade recente</h2>
-            <Link to="/dashboard/activity" className="text-sm text-green-400 hover:text-green-300">
-              Ver tudo
-            </Link>
-          </div>
+// =========================
+// Broadcasts
+// =========================
+function readBroadcasts(): Broadcast[] {
+  return ensureStore<Broadcast[]>(LS_BROADCASTS, [])
+}
+function writeBroadcasts(arr: Broadcast[]) {
+  writeJSON(LS_BROADCASTS, arr)
+}
 
-          {loading ? (
-            Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="rounded-lg border border-green-500/20 bg-gray-950 p-4 animate-pulse h-16" />
-            ))
-          ) : (
-            activities.map((a) => <ActivityItem key={a.id} a={a} />)
-          )}
-        </div>
+export async function listBroadcasts(): Promise<Broadcast[]> {
+  return readBroadcasts()
+}
 
-        {/* “Destaques” (placeholder) */}
-        <div className="space-y-3">
-          <div className="rounded-xl border border-green-500/20 bg-gray-950 p-4">
-            <div className="text-sm font-semibold mb-1">Destaque da semana</div>
-            <div className="text-sm text-gray-400">ROI médio ↑ 18% após automações de recuperação.</div>
-          </div>
-          <div className="rounded-xl border border-green-500/20 bg-gray-950 p-4">
-            <div className="text-sm font-semibold mb-1">Sugestão</div>
-            <div className="text-sm text-gray-400">Teste o modelo “Qualificação Rápida” para novos leads.</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+export async function createBroadcast(name: string, whenISO?: string): Promise<void> {
+  const arr = readBroadcasts()
+  const item: Broadcast = {
+    id: 'brd_' + uid(),
+    name,
+    createdAt: nowISO(),
+    totalRecipients: 0,
+    status: whenISO ? 'scheduled' : 'draft',
+    scheduledAt: whenISO,
+  }
+  arr.unshift(item)
+  writeBroadcasts(arr)
+}
+
+export async function scheduleBroadcast(id: string, whenISO: string): Promise<void> {
+  const arr = readBroadcasts()
+  const i = arr.findIndex((x) => x.id === id)
+  if (i >= 0) {
+    arr[i] = { ...arr[i], status: 'scheduled', scheduledAt: whenISO }
+    writeBroadcasts(arr)
+  }
+}
+
+// =========================
+// Flows / Funis
+// =========================
+
+export function listFlows(): Array<{ id: string; name: string; nodesCount: number; edgesCount: number; updatedAt: string }> {
+  const models = getAllRecords<FlowModel>(LS_FLOW_MODELS)
+  const list = Object.values(models).map((m) => ({
+    id: m.id,
+    name: m.name ?? 'Funil sem nome',
+    nodesCount: m.nodes.length,
+    edgesCount: m.edges.length,
+    updatedAt: m.updatedAt,
+  }))
+  return list.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+}
+
+export function createFlow(name = 'Novo funil'): { id: string } {
+  const id = 'flow_' + uid()
+  const model: FlowModel = {
+    id,
+    name,
+    nodes: [],
+    edges: [],
+    updatedAt: nowISO(),
+    createdAt: nowISO(),
+  }
+  upsertRecord<FlowModel>(LS_FLOW_MODELS, id, model)
+  return { id }
+}
+
+export function renameFlow(id: string, name: string): void {
+  const m = getRecord<FlowModel>(LS_FLOW_MODELS, id)
+  if (!m) return
+  m.name = name
+  m.updatedAt = nowISO()
+  upsertRecord(LS_FLOW_MODELS, id, m)
+}
+
+export function deleteFlow(id: string): void {
+  removeRecord<FlowModel>(LS_FLOW_MODELS, id)
+}
+
+export function duplicateFlow(id: string): { id: string } | null {
+  const m = getRecord<FlowModel>(LS_FLOW_MODELS, id)
+  if (!m) return null
+  const newId = 'flow_' + uid()
+  const clone: FlowModel = {
+    ...m,
+    id: newId,
+    name: `${m.name ?? 'Funil'} (cópia)`,
+    updatedAt: nowISO(),
+    createdAt: nowISO(),
+  }
+  upsertRecord(LS_FLOW_MODELS, newId, clone)
+  return { id: newId }
+}
+
+export function loadFlowModel(id: string): FlowModel {
+  const m = getRecord<FlowModel>(LS_FLOW_MODELS, id)
+  if (m) return m
+  const created: FlowModel = {
+    id,
+    name: 'Funil',
+    nodes: [],
+    edges: [],
+    updatedAt: nowISO(),
+    createdAt: nowISO(),
+  }
+  upsertRecord(LS_FLOW_MODELS, id, created)
+  return created
+}
+
+export function saveFlowModel(model: FlowModel): void {
+  model.updatedAt = nowISO()
+  upsertRecord<FlowModel>(LS_FLOW_MODELS, model.id, model)
+}
+
+// ===== Canvas helpers =====
+export function addNode(model: FlowModel, kind: NodeKind, x: number, y: number): FlowNode {
+  const id = 'n_' + uid()
+  const data: FlowNode['data'] =
+    kind === 'message'
+      ? { label: 'Mensagem', text: 'Texto da mensagem...' }
+      : kind === 'choice'
+      ? { label: 'Escolha', options: ['Opção 1', 'Opção 2'] }
+      : { label: 'Início' }
+
+  const node: FlowNode = { id, kind, x, y, data }
+  model.nodes.push(node)
+  model.updatedAt = nowISO()
+  return node
+}
+
+export function updateNode(model: FlowModel, nodeId: string, patch: Partial<FlowNode>) {
+  const i = model.nodes.findIndex((n) => n.id === nodeId)
+  if (i < 0) return
+  model.nodes[i] = { ...model.nodes[i], ...patch, data: { ...model.nodes[i].data, ...(patch.data ?? {}) } }
+  model.updatedAt = nowISO()
+}
+
+export function removeNode(model: FlowModel, nodeId: string) {
+  model.nodes = model.nodes.filter((n) => n.id !== nodeId)
+  model.edges = model.edges.filter((e) => e.from !== nodeId && e.to !== nodeId)
+  model.updatedAt = nowISO()
+}
+
+export function addEdge(model: FlowModel, fromId: string, toId: string) {
+  const exists = model.edges.some((e) => e.from === fromId && e.to === toId)
+  if (exists) return
+  const edge: FlowEdge = { id: 'e_' + uid(), from: fromId, to: toId }
+  model.edges.push(edge)
+  model.updatedAt = nowISO()
+}
+
+export function removeEdge(model: FlowModel, edgeId: string) {
+  model.edges = model.edges.filter((e) => e.id !== edgeId)
+  model.updatedAt = nowISO()
+}
+
+export function updateEdgeLabel(model: FlowModel, edgeId: string, label: string) {
+  const i = model.edges.findIndex((e) => e.id === edgeId)
+  if (i < 0) return
+  model.edges[i] = { ...model.edges[i], label }
+  model.updatedAt = nowISO()
+}
+
+// =========================
+// Dashboard snapshot
+// =========================
+export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
+  const bots = readBots().length
+  const contacts = ensureStore<any[]>(LS_CONTACTS, []).length
+  const messages = Object.values(getAllRecords<FlowModel>(LS_FLOW_MODELS)).reduce((acc, m) => {
+    return acc + (m.nodes?.filter((n) => n.kind === 'message').length ?? 0)
+  }, 0)
+
+  const successRate = bots > 0 || messages > 0 ? 92 : 0
+
+  return {
+    totals: {
+      automations: bots,
+      successRate,
+      contacts,
+      messages,
+    },
+  }
+}
+
+// =========================
+// Recent activity (mock derivado dos dados locais)
+// =========================
+export async function listRecentActivity(): Promise<Activity[]> {
+  const acts: Activity[] = []
+
+  // Flows atualizados
+  const flows = Object.values(getAllRecords<FlowModel>(LS_FLOW_MODELS))
+  for (const m of flows) {
+    acts.push({
+      id: 'act_' + uid(),
+      type: 'flow_published',
+      ts: m.updatedAt || nowISO(),
+      title: `Fluxo atualizado: ${m.name ?? 'Funil'}`,
+      description: `${m.nodes.length} nós, ${m.edges.length} ligações.`,
+      status: 'ok',
+    })
+  }
+
+  // Broadcasts
+  const brds = readBroadcasts()
+  for (const b of brds) {
+    acts.push({
+      id: 'act_' + uid(),
+      type: 'broadcast',
+      ts: (b as any).scheduledAt || b.createdAt || nowISO(),
+      title: `Campanha ${b.name} ${b.status === 'scheduled' ? 'agendada' : 'criada'}`,
+      description: b.status === 'scheduled'
+        ? `Agendada para ${new Date((b as any).scheduledAt!).toLocaleString()}`
+        : 'Em rascunho',
+      status: b.status === 'failed' ? 'error' : 'ok',
+    })
+  }
+
+  // Bots criados
+  const bots = readBots()
+  for (const b of bots) {
+    acts.push({
+      id: 'act_' + uid(),
+      type: 'bot_run',
+      ts: b.createdAt || nowISO(),
+      title: `Bot criado: ${b.name}`,
+      description: `Estado: ${b.status === 'active' ? 'Ativo' : 'Pausado'}`,
+      status: 'ok',
+    })
+  }
+
+  // Contatos (snapshot)
+  const contacts = ensureStore<any[]>(LS_CONTACTS, [])
+  if (contacts.length > 0) {
+    acts.push({
+      id: 'act_' + uid(),
+      type: 'contact_import',
+      ts: nowISO(),
+      title: `Contatos na base`,
+      description: `${contacts.length} contato(s) no CRM`,
+      status: 'ok',
+    })
+  }
+
+  // Ordena por data (desc) e limita a 12
+  acts.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime())
+  return acts.slice(0, 12)
 }

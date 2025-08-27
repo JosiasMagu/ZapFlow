@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Eye, EyeOff, Mail, Lock, ArrowRight,
   Shield, Zap, BarChart3, CheckCircle, ArrowLeft,
@@ -264,8 +265,7 @@ const LoginPage: React.FC = () => {
                   </button>
                   <span className="text-gray-500">
                     Não tem conta?
-                    <a href="#" className="text-green-400 hover:text-green-300 ml-1">Criar conta</a>
-                  </span>
+                    <Link to="/signup" className="text-green-400 hover:text-green-300 ml-1">Criar conta</Link>                      </span>
                 </div>
 
                 <div className="text-xs text-gray-500 text-center">

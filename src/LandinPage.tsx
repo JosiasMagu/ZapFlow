@@ -1,3 +1,4 @@
+// FILE: src/LandinPage.tsx
 import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
@@ -8,32 +9,22 @@ import CTA from './components/CTA';
 import Footer from './components/Footer';
 
 const LandingPage: React.FC = () => {
-  // Estado para controlar se o menu mobile está aberto
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-
-  // Estado para controlar se a página foi scrollada
   const [scrolled, setScrolled] = useState(false);
 
-  // Detecta scroll para mudar estilo da Navbar
   useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
-    };
+    const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   return (
     <>
-      <Navbar 
-        isMenuOpen={isMenuOpen} 
-        setIsMenuOpen={setIsMenuOpen} 
-        scrolled={scrolled} 
-      />
-      <Hero />
+      <Navbar isMenuOpen={isMenuOpen} setIsMenuOpen={setIsMenuOpen} scrolled={scrolled} />
+      <Hero />       {/* garanta que o botão “Testar grátis” navega para /signup */}
       <Benefits />
       <Testimonials />
-      <Pricing />
+      <Pricing />    {/* e aqui também, no CTA de planos */}
       <CTA />
       <Footer />
     </>

@@ -1,7 +1,9 @@
-// src/Pages/Context/UpgradeContext0.tsx
-import  { createContext, useContext, useState, type ReactNode } from 'react'
+// FILE: src/Pages/Context/UpgradeContext.tsx
+// Contexto de upgrade (gating). Use em todo o app.
 
-type Feature = 'bot' | 'flow' | 'broadcast' | 'advanced'
+import { createContext, useContext, useState, type ReactNode } from 'react'
+
+type Feature = 'bot' | 'flow' | 'broadcast' | 'advanced' | 'contacts'
 
 type UpgradeContextValue = {
   isOpen: boolean
@@ -16,10 +18,7 @@ export function UpgradeProvider({ children }: { children?: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false)
   const [sourceFeature, setSourceFeature] = useState<Feature | undefined>()
 
-  const open = (from?: Feature) => {
-    setSourceFeature(from)
-    setIsOpen(true)
-  }
+  const open = (from?: Feature) => { setSourceFeature(from); setIsOpen(true) }
   const close = () => setIsOpen(false)
 
   return (
@@ -31,8 +30,6 @@ export function UpgradeProvider({ children }: { children?: ReactNode }) {
 
 export function useUpgrade() {
   const ctx = useContext(UpgradeContext)
-  if (!ctx) {
-    throw new Error('useUpgrade deve ser usado dentro de <UpgradeProvider />')
-  }
+  if (!ctx) throw new Error('useUpgrade deve ser usado dentro de <UpgradeProvider />')
   return ctx
 }

@@ -1,14 +1,15 @@
 // src/Pages/Dashboard/Contacts/ContactsPage.tsx
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useDeferredValue } from 'react'
 import { listContacts } from '../../lib/api'
 import type { Contact } from '../../lib/types'
 import UploadContacts from '../Broadcasts/UploadsContacts'
 import { RefreshCcw, Search } from 'lucide-react'
 
 export default function ContactsPage() {
-  const [items, setItems] = useState<Contact[]>([])
+  const [items, setItems] = useState<Contact[]>([]) 
   const [loading, setLoading] = useState(false)
   const [q, setQ] = useState('')
+  const qDeferred = useDeferredValue(q) // ⬅️ evita travar enquanto digita
   const [showImport, setShowImport] = useState(false)
 
   const load = async () => {
@@ -20,14 +21,14 @@ export default function ContactsPage() {
   useEffect(() => { load() }, [])
 
   const filtered = useMemo(() => {
-    const qq = q.trim().toLowerCase()
+    const qq = qDeferred.trim().toLowerCase()
     if (!qq) return items
     return items.filter(c =>
       c.name.toLowerCase().includes(qq) ||
       c.phone.toLowerCase().includes(qq) ||
       c.tags.join(' ').toLowerCase().includes(qq)
     )
-  }, [q, items])
+  }, [qDeferred, items])
 
   return (
     <div className="space-y-6">

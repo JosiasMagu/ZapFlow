@@ -1,5 +1,5 @@
-// src/Pages/Dashboard/Bots/BotsPage.tsx
-import  { useEffect, useMemo, useState } from 'react'
+// FILE: src/Pages/Bots/BotsPage.tsx
+import { useEffect, useMemo, useState } from 'react'
 import { Plus, Power, Trash2, Bot as BotIcon } from 'lucide-react'
 import type { Bot } from '../../lib/types'
 import { getSession, listBots, createBot, toggleBot, deleteBot } from '../../lib/api'
@@ -10,7 +10,8 @@ const TRIAL_BOT_LIMIT = 1
 export default function BotsPage() {
   const { open: openUpgrade } = useUpgrade()
   const session = getSession()
-  const isTrial = session?.plan === 'trial'
+  const plan = session?.plan ?? 'trial'
+  const isTrial = plan === 'trial'
 
   const [bots, setBots] = useState<Bot[]>([])
   const [loading, setLoading] = useState(true)

@@ -9,7 +9,16 @@ export default function TrialBanner() {
   const session = getSession()
   if (!session || session.plan !== 'trial') return null
 
-  const left = daysLeft(session.trialEndsAt)
+  // Evita erro de TS: acessa chaves opcionais de forma dinâmica
+  const trialEndsIso: string | undefined =
+    (session as any)?.trial?.expiresAt ??
+    (session as any)?.trialEndsAt ??
+    (session as any)?.trial_end
+
+  // Se não houver data de expiração conhecida, não exibe o banner
+  if (!trialEndsIso) return null
+
+  const left = daysLeft(trialEndsIso)
   if (left <= 0) return null
 
   const isUrgent = left <= 3
@@ -84,9 +93,8 @@ export default function TrialBanner() {
           </div>
         </div>
 
-        {/* CTA */}
         <Link
-          to="/#pricing" // troque para "/dashboard/settings/billing" quando tiver a rota
+          to="/#pricing"
           className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 hover:scale-105 hover:shadow-lg ${
             isUrgent
               ? 'bg-red-500 text-black hover:bg-red-400 hover:shadow-red-500/25'
@@ -100,7 +108,6 @@ export default function TrialBanner() {
         </Link>
       </div>
 
-      {/* Progress bar com ARIA */}
       <div className="mt-3">
         <div className="flex justify-between text-xs mb-1">
           <span

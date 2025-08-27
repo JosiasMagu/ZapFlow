@@ -1,62 +1,53 @@
-// src/Pages/Auth/SignUpPage.tsx
-import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+// FILE: src/Pages/Auth/SignUpPage.tsx
+// Versão simples com campo WhatsApp (phone). Usa createTrialSession do api.ts.
+
+import { useState } from 'react'
 import { createTrialSession } from '../../lib/api'
+import { useNavigate } from 'react-router-dom'
 
 export default function SignUpPage() {
+  const nav = useNavigate()
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
+  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const navigate = useNavigate()
+  const [err, setErr] = useState<string | null>(null)
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setError(null)
-    setLoading(true)
-
+    setErr(null); setLoading(true)
     try {
-      // cria sessão trial (lança erro se e-mail inválido)
-      await createTrialSession(email || 'trial@zapflow.co.mz')
-      // se chegou aqui, sessão foi criada e salva no localStorage
-      navigate('/dashboard', { replace: true })
-    } catch (err: unknown) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : 'Falha ao criar conta de teste'
-      setError(msg)
-    } finally {
-      setLoading(false)
-    }
+      await createTrialSession({ name, email, password, phone })
+      nav('/dashboard')
+    } catch (e: any) {
+      setErr(e?.message || 'Falha ao criar conta.')
+    } finally { setLoading(false) }
   }
 
   return (
-    <div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-sm space-y-4 border border-green-500/20 rounded-lg p-6"
-      >
-        <h1 className="text-2xl font-bold">Criar conta (teste)</h1>
-
-        {error && (
-          <div className="text-red-400 text-sm">{error}</div>
-        )}
-
-        <input
-          type="email"
-          placeholder="voce@empresa.co.mz"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          className="w-full rounded-md border border-green-500/30 bg-black px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-green-400"
-        />
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-md bg-green-500 text-black font-semibold py-2 hover:bg-green-400 disabled:opacity-60"
-        >
-          {loading ? 'Criando…' : 'Criar e entrar'}
+    <div className="max-w-md mx-auto mt-16 rounded-xl border border-green-500/20 bg-gray-950 p-6">
+      <h1 className="text-xl font-semibold mb-4">Crie sua conta (Teste grátis)</h1>
+      {err && <div className="mb-3 text-sm text-red-300">{err}</div>}
+      <form onSubmit={onSubmit} className="space-y-3">
+        <div>
+          <label className="text-xs text-gray-300">Nome</label>
+          <input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 w-full rounded-lg border border-green-500/20 bg-black p-2 text-sm" />
+        </div>
+        <div>
+          <label className="text-xs text-gray-300">E-mail</label>
+          <input value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 w-full rounded-lg border border-green-500/20 bg-black p-2 text-sm" />
+        </div>
+        <div>
+          <label className="text-xs text-gray-300">WhatsApp</label>
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+258 84 000 0000" className="mt-1 w-full rounded-lg border border-green-500/20 bg-black p-2 text-sm" />
+        </div>
+        <div>
+          <label className="text-xs text-gray-300">Senha</label>
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 w-full rounded-lg border border-green-500/20 bg-black p-2 text-sm" />
+        </div>
+        <button disabled={loading} className="w-full rounded-lg bg-green-500 text-black font-semibold py-2 hover:bg-green-400 disabled:opacity-60">
+          {loading ? 'Criando...' : 'Começar teste grátis'}
         </button>
       </form>
     </div>
