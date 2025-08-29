@@ -62,11 +62,7 @@ function getAllRecords<T>(key: string): Record<string, T> {
 }
 
 // =========================
-// Sessão / Autenticação (MVP local)
-// =========================
-
 export function getSession(): UserSession | null {
-  // readJSON pode devolver undefined; normalizamos para null.
   const s = readJSON<UserSession | null | undefined>(LS_SESSION, null as any)
   return s ?? null
 }
@@ -86,9 +82,7 @@ export type User = {
 }
 
 /**
- * Cria sessão de teste (trial). Compatível com:
- *  - createTrialSession({ name, email, password?, phone? })
- *  - createTrialSession(name: string, email?: string, password?: string, phone?: string)  // legado
+ * Cria sessão de teste (trial).
  */
 export async function createTrialSession(
   argsOrName: { name: string; email: string; password?: string; phone?: string } | string,
@@ -101,12 +95,10 @@ export async function createTrialSession(
   let phone: string | undefined
 
   if (typeof argsOrName === 'string') {
-    // Assinatura antiga
     name = argsOrName || 'Usuário'
     email = emailMaybe || `${(crypto as any).randomUUID?.() ?? Date.now()}@example.test`
     phone = phoneMaybe
   } else {
-    // Assinatura nova (objeto)
     ({ name, email, phone } = argsOrName)
   }
 
@@ -119,7 +111,6 @@ export async function createTrialSession(
   }
   writeJSON(LS_SESSION, session)
 
-  // Perfil básico opcional
   const profile = { id: session.userId, email: session.email, plan: session.plan, name, phone }
   writeJSON('mock_profile', profile)
 
@@ -132,12 +123,9 @@ export async function loginWithEmail(
 ): Promise<ApiResult<UserSession>> {
   const existing = getSession()
   if (!existing) {
-    // cria trial e retorna imediatamente
     const r = await createTrialSession({ name: email.split('@')[0] || 'Usuário', email })
     return r
   }
-
-  // já existe sessão — sincroniza email se mudou
   let session: UserSession = existing
   if (session.email !== email) {
     session = { ...session, email }
@@ -146,11 +134,10 @@ export async function loginWithEmail(
   return { ok: true, data: session }
 }
 
-// (compat p/ AuthProvider / hooks)
-export async function getMe(_token: string): Promise<User | null> {
+export async function getMe(_token: string) {
   const s = getSession()
   if (!s) return null
-  const profile = readJSON<User | null>('mock_profile', null as any)
+  const profile = readJSON<any>('mock_profile', null as any)
   return profile ?? { id: s.userId, email: s.email, plan: s.plan }
 }
 
@@ -166,7 +153,7 @@ export async function getWhatsappStatus(): Promise<{ ok: true; data: { status: W
 }
 
 // =========================
-// Bots (IA) — CRUD simples via array no LS
+// Bots (IA) — CRUD simples
 // =========================
 function readBots(): Bot[] {
   return ensureStore<Bot[]>(LS_BOTS, [])
@@ -241,9 +228,8 @@ export async function scheduleBroadcast(id: string, whenISO: string): Promise<vo
 }
 
 // =========================
-// Flows / Funis
+// Flows / Funis (modelo)
 // =========================
-
 export function listFlows(): Array<{ id: string; name: string; nodesCount: number; edgesCount: number; updatedAt: string }> {
   const models = getAllRecords<FlowModel>(LS_FLOW_MODELS)
   const list = Object.values(models).map((m) => ({
@@ -317,7 +303,7 @@ export function saveFlowModel(model: FlowModel): void {
   upsertRecord<FlowModel>(LS_FLOW_MODELS, model.id, model)
 }
 
-// ===== Canvas helpers =====
+// ===== Canvas helpers (modelo) =====
 export function addNode(model: FlowModel, kind: NodeKind, x: number, y: number): FlowNode {
   const id = 'n_' + uid()
   const data: FlowNode['data'] =

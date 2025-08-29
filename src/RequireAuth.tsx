@@ -1,20 +1,23 @@
+import React from "react";
+import { Navigate, useLocation } from "react-router-dom";
+// Se usas um AuthProvider real, importa o hook daqui:
+// import { useAuth } from "./Pages/Provider/AuthProvider";
 
-import { Navigate, Outlet, useLocation } from 'react-router-dom'
-import { useAuth } from './Pages/Provider/AuthProvider'
+const useFakeAuth = () => {
+  // TROCA por teu hook real (ex.: useAuth())
+  // Aqui só para não travar tua navegação enquanto o back não está integrado
+  const token = localStorage.getItem("auth_token");
+  return { isAuthenticated: !!token };
+};
 
-/**
- * Protege rotas abaixo dela.
- * - Se NÃO houver token => redireciona para /signup
- * - Se houver token => renderiza as rotas-filhas (<Outlet />)
- */
-export default function RequireAuth() {
-  const { token } = useAuth()
-  const location = useLocation()
+const RequireAuth: React.FC<{ children: React.ReactElement }> = ({ children }) => {
+  const location = useLocation();
+  const { isAuthenticated } = useFakeAuth();
 
-  if (!token) {
-    // volta para onde o usuário tentou ir depois que fizer signup/login
-    return <Navigate to="/signup" replace state={{ from: location }} />
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
   }
+  return children;
+};
 
-  return <Outlet />
-}
+export default RequireAuth;

@@ -1,21 +1,32 @@
-// FILE: src/components/QuotaBar.tsx
-// Barrinha de progresso para o Dashboard
+import React, { useMemo } from "react";
 
-export default function QuotaBar({
-  label, used, limit, hint,
-}: { label: string; used: number; limit: number; hint?: string }) {
-  const pct = Math.min(100, Math.round((used / Math.max(1, limit)) * 100))
-  const color = pct >= 100 ? 'bg-red-500' : pct >= 80 ? 'bg-yellow-400' : 'bg-green-500'
-  return (
-    <div className="rounded-xl border border-green-500/20 bg-gray-950 p-3">
-      <div className="flex justify-between text-sm">
-        <div className="text-gray-200">{label}</div>
-        <div className="text-gray-400">{used}/{limit}</div>
-      </div>
-      <div className="mt-2 h-2 w-full rounded bg-gray-800">
-        <div className={`h-2 rounded ${color}`} style={{ width: `${pct}%` }} />
-      </div>
-      {hint && <div className="mt-1 text-[11px] text-gray-400">{hint}</div>}
-    </div>
-  )
+interface QuotaBarProps {
+  name: string;
+  used: number;
+  limit: number;
+  colorClass?: string; // ex.: "bg-blue-500"
 }
+
+const QuotaBar: React.FC<QuotaBarProps> = ({ name, used, limit, colorClass = "bg-green-500" }) => {
+  const percentage = useMemo(() => (limit > 0 ? (used / limit) * 100 : 0), [used, limit]);
+  const isNearLimit = percentage >= 80;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-gray-300 font-medium">{name}</span>
+        <span className={`text-sm font-medium ${isNearLimit ? "text-orange-400" : "text-gray-400"}`}>
+          {used}/{limit}
+        </span>
+      </div>
+      <div className="w-full bg-gray-700 rounded-full h-2">
+        <div
+          className={`h-2 rounded-full transition-all duration-300 ${isNearLimit ? "bg-orange-500" : colorClass}`}
+          style={{ width: `${Math.min(percentage, 100)}%` }}
+        />
+      </div>
+    </div>
+  );
+};
+
+export default QuotaBar;

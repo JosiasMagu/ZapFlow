@@ -1,106 +1,337 @@
 // FILE: src/Layouts/DashboardLayouts.tsx
-import { NavLink, Outlet, Link } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from "react";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
-  BarChart3, Cable, GitBranch, Send, Users, GraduationCap,
-  Megaphone, Gift, MessageCircle, Puzzle, LogOut
-} from 'lucide-react'
-import { getWhatsappStatus, type WhatsappStatus } from '@/lib/api'
-import type { ApiResult } from '@/lib/types'
+  BarChart3,
+  Zap,
+  Filter,
+  Send,
+  Users,
+  GraduationCap,
+  Megaphone,
+  Gift,
+  MessageCircle,
+  Puzzle,
+  LogOut,
+  ChevronDown,
+  Settings,
+  HelpCircle,
+  X,
+  // 👇 novos ícones para o toggle
+  PanelLeftOpen,
+  PanelLeftClose,
+} from "lucide-react";
+import { getWhatsappStatus } from "../lib/api";
 
-const nav = [
-  { to: '/dashboard', label: 'Métricas', icon: BarChart3 },
-  { to: '/dashboard/connection', label: 'Conexão', icon: Cable },            // (rota opcional)
-  { to: '/dashboard/flows', label: 'Funis', icon: GitBranch },
-  { to: '/dashboard/broadcasts', label: 'Disparos', icon: Send, beta: true },
-  { to: '/dashboard/contacts', label: 'Contatos', icon: Users },
-  { to: '/dashboard/training', label: 'Treinamento', icon: GraduationCap },   // (rota opcional)
-  { to: '/dashboard/campaigns', label: 'Campanhas', icon: Megaphone },        // (rota opcional)
-  { to: '/dashboard/refer', label: 'Indique e ganhe', icon: Gift },           // (rota opcional)
-  { to: '/dashboard/livechat', label: 'Bate-papo ao vivo', icon: MessageCircle }, // (rota opcional)
-  { to: '/dashboard/extension', label: 'Extensão', icon: Puzzle },            // (rota opcional)
-]
+// Se preferir centralizar tipos, podes mover para src/lib/types.ts
+export type WhatsAppStatus = "connected" | "connecting" | "qr" | "disconnected";
 
-export default function DashboardLayout() {
-  const [wpp, setWpp] = useState<WhatsappStatus>('disconnected')
+interface MenuItem {
+  icon: React.ElementType;
+  label: string;
+  to: string;
+  enabled: boolean;
+  tooltip?: string;
+  key: string;
+}
 
+const DashboardLayouts: React.FC = () => {
+  const navigate = useNavigate();
+
+  const [whatsappStatus, setWhatsappStatus] = useState<WhatsAppStatus>("connected");
+  const [showAccountDropdown, setShowAccountDropdown] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+
+  // 👉 NOVO: estado da sidebar (aberta/fechada)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Polling do status WhatsApp a cada 5s
   useEffect(() => {
-    // Carrega uma vez; se quiser, transforme em polling com setInterval
-    getWhatsappStatus().then((r: ApiResult<{ status: WhatsappStatus }>) => {
-      if (r.ok && r.data) setWpp(r.data.status)
-    })
-  }, [])
+    let alive = true;
+    const tick = async () => {
+      try {
+        const r = await getWhatsappStatus();
+        if (!alive) return;
+        setWhatsappStatus(r.data.status as WhatsAppStatus);
+      } catch {
+        if (!alive) return;
+        setWhatsappStatus("disconnected");
+      }
+    };
+    tick();
+    const id = setInterval(tick, 5000);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, []);
 
-  const statusColor =
-    wpp === 'connected' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-    : wpp === 'qr' || wpp === 'connecting' ? 'bg-yellow-500/10 text-yellow-300 border-yellow-500/30'
-    : 'bg-red-500/10 text-red-300 border-red-500/30'
+  const statusConfig = useMemo(() => {
+    switch (whatsappStatus) {
+      case "connected":
+        return { dot: "bg-green-500", text: "Conectado", textColor: "text-green-400" };
+      case "connecting":
+        return { dot: "bg-yellow-500", text: "Conectando…", textColor: "text-yellow-400" };
+      case "qr":
+        return { dot: "bg-yellow-500", text: "Aguardando QR", textColor: "text-yellow-400" };
+      case "disconnected":
+      default:
+        return { dot: "bg-red-500", text: "Desconectado", textColor: "text-red-400" };
+    }
+  }, [whatsappStatus]);
+
+  const menuItems: MenuItem[] = [
+    { icon: BarChart3, label: "Métricas",   to: "/dashboard",         enabled: true,  key: "metricas"   },
+    { icon: Zap,       label: "Conexão",    to: "/dashboard/conexao", enabled: true,  key: "conexao"    },
+    { icon: Filter,    label: "Funis",      to: "/dashboard/funis",   enabled: true,  key: "funis"      },
+    { icon: Send,      label: "Disparos",   to: "/dashboard/disparos",enabled: true,  key: "disparos"   },
+    { icon: Users,     label: "Contatos",   to: "/dashboard/contatos",enabled: true,  key: "contatos"   },
+    { icon: GraduationCap, label: "Treinamento", to: "#", enabled: false, tooltip: "Faça upgrade", key: "treinamento" },
+    { icon: Megaphone, label: "Campanhas",  to: "#", enabled: false, tooltip: "Faça upgrade", key: "campanhas" },
+    { icon: Gift,      label: "Indique e ganhe", to: "#", enabled: false, tooltip: "Faça upgrade", key: "indique" },
+    { icon: MessageCircle, label: "Livechat", to: "#", enabled: false, tooltip: "Faça upgrade", key: "livechat" },
+    { icon: Puzzle,    label: "Extensão",   to: "#", enabled: false, tooltip: "Faça upgrade", key: "extensao" },
+  ];
+
+  const handleLogout = () => {
+    setShowLogoutModal(false);
+    navigate("/login", { replace: true });
+  };
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      {/* Topbar */}
-      <header className="h-14 border-b border-green-500/20 bg-gray-950/60 backdrop-blur-sm">
-        <div className="mx-auto max-w-7xl h-full flex items-center justify-between px-4">
-          <div className="flex items-center gap-3">
-            <Link to="/" className="font-semibold tracking-tight">ZapFlow</Link>
-            <span className={`text-xs px-2 py-0.5 rounded-full border capitalize ${statusColor}`}>
-              {wpp === 'connected' ? 'conectado' : wpp}
-            </span>
+    <div className="h-screen bg-gray-900 flex overflow-hidden">
+      {/* Sidebar */}
+      <aside
+        className={[
+          "bg-gray-800 flex flex-col border-r border-gray-700 transition-all duration-300",
+          sidebarCollapsed ? "w-16" : "w-64",
+        ].join(" ")}
+      >
+        {/* Topo da sidebar (logo/brand + toggle quando colapsada) */}
+        <div className="p-4 border-b border-gray-700 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
+              <MessageCircle className="w-5 h-5 text-white" />
+            </div>
+            {/* Oculta o texto quando colapsada */}
+            {!sidebarCollapsed && <h2 className="text-xl font-bold text-white">ZapFlow</h2>}
           </div>
-          <div className="text-sm text-gray-300">
-            Conta: <span className="inline-block rounded-md border border-green-500/30 px-2 py-0.5 bg-black/50">Principal</span>
-          </div>
+
+          {/* Botão de colapsar/expandir dentro da própria sidebar (opcional)
+          <button
+            onClick={() => setSidebarCollapsed((s) => !s)}
+            className="p-2 rounded-md text-gray-300 hover:text-white hover:bg-gray-700 transition-colors"
+            aria-label={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}
+            title={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}
+          >
+            {sidebarCollapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+          </button> */}
         </div>
-      </header>
 
-      <div className="mx-auto max-w-7xl flex">
-        {/* Sidebar */}
-        <aside className="w-60 shrink-0 border-r border-green-500/20 bg-gray-950/40">
-          <nav className="p-2">
-            {nav.map(item => {
-              const Icon = item.icon
+        <nav className="flex-1 py-4 overflow-y-auto px-2">
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+
+            if (!item.enabled) {
+              const tooltipId = `tt-${item.key}`;
               return (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  className={({ isActive }) =>
-                    `group flex items-center justify-between rounded-lg px-3 py-2 text-sm
-                     ${isActive ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-200'
-                                : 'text-gray-300 hover:bg-green-500/10 border border-transparent'}`
-                  }
+                <div
+                  key={item.key}
+                  className="relative mb-1"
+                  onMouseEnter={() => setHoveredItem(item.key)}
+                  onMouseLeave={() => setHoveredItem(null)}
                 >
-                  <span className="flex items-center gap-2">
-                    <Icon className="h-4 w-4 text-green-400" />
-                    {item.label}
-                  </span>
-                  {item.beta && (
-                    <span className="text-[10px] rounded-full border border-yellow-500/30 bg-yellow-500/10 px-1.5 py-0.5 text-yellow-300">
-                      Beta
-                    </span>
-                  )}
-                </NavLink>
-              )
-            })}
-            <div className="h-px my-2 bg-green-500/20" />
-            <button className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-300 hover:bg-red-500/10">
-              <LogOut className="h-4 w-4" /> Sair
-            </button>
-          </nav>
-        </aside>
+                  <button
+                    type="button"
+                    aria-disabled="true"
+                    tabIndex={-1}
+                    className={[
+                      "w-full flex items-center px-2 py-2.5 rounded-lg text-left text-gray-600 cursor-not-allowed opacity-50 border border-transparent",
+                      sidebarCollapsed ? "justify-center" : "space-x-3",
+                    ].join(" ")}
+                    aria-describedby={hoveredItem === item.key ? tooltipId : undefined}
+                    title={sidebarCollapsed ? (item.tooltip || item.label) : undefined}
+                  >
+                    <Icon className="w-5 h-5 text-gray-600" />
+                    {!sidebarCollapsed && <span className="font-medium">{item.label}</span>}
+                  </button>
 
-        {/* Conteúdo */}
-        <main className="flex-1 p-4">
+                  {/* Tooltip somente quando expandida e item desabilitado, para manter acessível */}
+                  {!sidebarCollapsed && hoveredItem === item.key && item.tooltip && (
+                    <div
+                      role="tooltip"
+                      id={tooltipId}
+                      className="absolute left-full ml-2 top-1/2 -translate-y-1/2 z-50"
+                    >
+                      <div className="bg-gray-900 text-white px-2 py-1 rounded text-xs whitespace-nowrap border border-gray-600">
+                        {item.tooltip}
+                        <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-900" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            return (
+              <NavLink
+                end={item.to === "/dashboard"}
+                key={item.key}
+                to={item.to}
+                className={({ isActive }) =>
+                  [
+                    "w-full flex items-center px-2 py-2.5 rounded-lg text-left transition-all duration-200 mb-1",
+                    sidebarCollapsed ? "justify-center" : "space-x-3",
+                    isActive
+                      ? "bg-green-500 text-white shadow-lg"
+                      : "text-gray-300 hover:bg-gray-700 hover:text-white",
+                  ].join(" ")
+                }
+                title={sidebarCollapsed ? item.label : undefined}
+              >
+                {({ isActive }) => (
+                  <>
+                    <Icon className={`w-5 h-5 ${isActive ? "text-white" : "text-gray-400"}`} />
+                    {!sidebarCollapsed && <span className="font-medium truncate">{item.label}</span>}
+                  </>
+                )}
+              </NavLink>
+            );
+          })}
+        </nav>
+
+        <div className="p-3 border-t border-gray-700">
+          <button
+            onClick={() => setShowLogoutModal(true)}
+            className={[
+              "w-full flex items-center px-2 py-2.5 rounded-lg text-gray-300 hover:bg-red-600 hover:text-white transition-all duration-200",
+              sidebarCollapsed ? "justify-center" : "space-x-3",
+            ].join(" ")}
+            title={sidebarCollapsed ? "Sair" : undefined}
+          >
+            <LogOut className="w-5 h-5" />
+            {!sidebarCollapsed && <span className="font-medium">Sair</span>}
+          </button>
+        </div>
+      </aside>
+
+      {/* Main */}
+      <section className="flex-1 flex flex-col min-w-0">
+        {/* Topbar */}
+        <header className="bg-gray-800 border-b border-gray-700 px-4 md:px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3 md:space-x-6">
+              {/* 👇 Botão global para abrir/fechar a sidebar */}
+              <button
+                onClick={() => setSidebarCollapsed((s) => !s)}
+                className="p-2 rounded-md text-gray-300 hover:text-white hover:bg-gray-700 transition-colors"
+                aria-label={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}
+                title={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}
+              >
+                {sidebarCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
+              </button>
+
+              <div className="hidden sm:flex items-center space-x-3">
+                <img
+                  src="/src/assets/logo.jpeg"
+                  alt="ZapFlow"
+                  className="w-8 h-8 rounded-lg object-cover"
+                />
+                <span className="text-white font-semibold">ZapFlow</span>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <div className={`w-3 h-3 rounded-full ${statusConfig.dot} animate-pulse`} />
+                <span className={`text-sm font-medium ${statusConfig.textColor}`}>
+                  WhatsApp: {statusConfig.text}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-4">
+              <div className="relative">
+                <button
+                  onClick={() => setShowAccountDropdown((s) => !s)}
+                  className="flex items-center space-x-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+                >
+                  <span className="text-white text-sm font-medium">Conta: Principal</span>
+                  <ChevronDown className="w-4 h-4 text-gray-400" />
+                </button>
+
+                {showAccountDropdown && (
+                  <div className="absolute right-0 mt-2 w-48 bg-gray-700 border border-gray-600 rounded-lg shadow-lg z-50">
+                    <div className="py-1">
+                      <button className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-600 hover:text-white">
+                        Conta: Principal
+                      </button>
+                      <div className="border-t border-gray-600" />
+                      <button
+                        className="w-full text-left px-4 py-2 text-sm text-gray-400 cursor-not-allowed"
+                        aria-disabled="true"
+                        tabIndex={-1}
+                      >
+                        Adicionar conta
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <button className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors">
+                <Settings className="w-5 h-5" />
+              </button>
+              <button className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors">
+                <HelpCircle className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-y-auto bg-gray-900">
           <Outlet />
         </main>
-      </div>
+      </section>
 
-      {/* Botão de ajuda (WhatsApp) */}
-      <a
-        href="#"
-        className="fixed right-4 bottom-4 rounded-full bg-emerald-500 text-black font-semibold px-4 py-2 shadow-lg hover:bg-emerald-400"
-      >
-        Precisa de ajuda?
-      </a>
+      {showLogoutModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
+          <div className="bg-gray-800 rounded-lg p-6 w-96 border border-gray-700">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">Confirmar Logout</h3>
+              <button
+                onClick={() => setShowLogoutModal(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-gray-300 mb-6">Tem certeza que deseja sair da sua conta?</p>
+            <div className="flex space-x-3 justify-end">
+              <button
+                onClick={() => setShowLogoutModal(false)}
+                className="px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleLogout}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+              >
+                Sair
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAccountDropdown && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setShowAccountDropdown(false)}
+        />
+      )}
     </div>
-  )
-}
+  );
+};
+
+export default DashboardLayouts;
